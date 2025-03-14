@@ -1,0 +1,11 @@
+streamlit==1.38.0
+streamlit_webrtc
+requests
+pandas
+altair
+av
+numpy
+twilio
+pydub
+aiortc
+openai

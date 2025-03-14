@@ -10,6 +10,7 @@ from streamlit_webrtc import WebRtcMode, webrtc_streamer
 import requests
 import altair as alt
 import pandas as pd
+st.set_page_config(layout="wide",page_title="realtime-transcribe")
 
 logger = logging.getLogger(__name__)
 
@@ -52,11 +53,15 @@ webrtc_ctx = webrtc_streamer(
 st.button(
     "録音 " + ("停止" if st.session_state.recording else "開始"), 
     on_click=toggle_recording,
-    type="primary" if st.session_state.recording else "secondary"
+    type="primary" if st.session_state.recording else "secondary",
+    disabled=webrtc_ctx.audio_receiver is None
 )
 
 if 'full_text' not in st.session_state:
-    st.session_state.full_text = ""
+    st.session_state.full_text = ()
+
+if webrtc_ctx.audio_receiver is None:
+    st.session_state.recording = False
 
 # 無音部分の検出結果を表示する場所
 silence_info_placeholder = st.empty()
@@ -67,6 +72,7 @@ st.sidebar.title("無音検出設定")
 silence_threshold = st.sidebar.slider(
     "無音しきい値 (dB)", 
     -80, 0, -35,
+    disabled=st.session_state.recording,
     help="音声を「無音」と判断する音量レベルを設定します。\n"
          "値が小さいほど（例：-50dB）より小さな音も「音声あり」と判断します。\n"
          "値が大きいほど（例：-20dB）大きな音のみを「音声あり」と判断します。"
@@ -75,6 +81,7 @@ silence_threshold = st.sidebar.slider(
 min_silence_duration = st.sidebar.slider(
     "最小無音時間 (ms)", 
     100, 500, 200,
+    disabled=st.session_state.recording,
     help="この時間以上の無音が続いた場合に「無音区間」と判断します。\n"
          "短すぎると話の途中の短い間も無音と判断され、\n"
          "長すぎると長めの間も音声の一部と判断されます。"
@@ -85,6 +92,7 @@ st.sidebar.title("録音設定")
 auto_stop_duration = st.sidebar.slider(
     "無音検出時の自動停止 (ms)", 
     100, 2000, 1000,
+    disabled=st.session_state.recording,
     help="この時間以上の無音が続くと、自動的に録音を停止します。\n"
          "話者の発話が終わったことを検出するための設定です。\n"
          "短すぎると話の途中で録音が止まり、長すぎると無駄な無音時間が録音されます。"
@@ -93,6 +101,7 @@ auto_stop_duration = st.sidebar.slider(
 min_recording_duration = st.sidebar.slider(
     "最低録音時間 (秒)", 
     1, 10, 2,
+    disabled=st.session_state.recording,
     help="録音を保存する最低限の長さを設定します。\n"
          "これより短い録音は無視されます。\n"
          "短すぎると雑音なども録音されやすく、長すぎると短い返事なども無視されます。"
@@ -102,10 +111,11 @@ with st.sidebar:
         "言語",
         ["ja", "en" ,"zh"],
         index=0,
+        disabled=st.session_state.recording,
         help="音声認識に使用する言語を選択します。"
     )
-    if st.button("initial promptのリセット",type="primary"):
-        st.session_state.full_text = ""
+    if st.button("initial prompt/文字起こし履歴のリセット",type="primary",disabled=st.session_state.recording):
+        st.session_state.full_text = ()
 
 status_placeholder = st.empty()
 chart_placeholder = st.empty()
@@ -162,10 +172,10 @@ async def save_and_display_audio(audio_segment):
         # ファイルを開いてバイナリモードで読み込む
         with open(temp_file_path, 'rb') as audio_file:
             response = requests.post(
-                "http://XXX.XXX.XXX.XXX:XXXX/transcribe",  # 音声認識APIのエンドポイント
+                "http://XXX.XXX.XXX:XXXX/transcribe",  # 音声認識APIのエンドポイント
                 files={"audio": ('audio.wav', audio_file, 'audio/wav')},
                 data={"model": "汎用モデル", "save_audio": False, "file_name": "temp_audio.wav","language" : language,
-                      "initial_prompt": st.session_state.full_text}  # 初期プロンプトに前の認識結果を使用
+                      "initial_prompt": "\n".join(st.session_state.full_text) if st.session_state.full_text else ""}
             )
         
         # レスポンスのステータスコードを確認
@@ -175,7 +185,8 @@ async def save_and_display_audio(audio_segment):
                 if "full_text" in json_data:
                     full_text = json_data['full_text']
                     # 文字列の先頭に追加（新しいテキストが上に表示される）
-                    st.session_state.full_text = full_text + "\n" + st.session_state.full_text
+                    st.session_state.full_text = (full_text,) + st.session_state.full_text
+
                 else:
                     st.markdown(f"**APIレスポンス:**\n{json_data}")
             except ValueError:
@@ -192,12 +203,12 @@ async def save_and_display_audio(audio_segment):
     #     client = OpenAI()
     #     response = client.audio.transcriptions.create(model="whisper-1", file=audio_file)
     #     full_text = response.text
-    #     st.session_state.full_text = full_text + "\n" + st.session_state.full_text
+    #     st.session_state.full_text = (full_text,) + st.session_state.full_text
 
-    transcription_placeholder.markdown(st.session_state.full_text)
-    
+
     # セッション状態に最低録音時間を保存
     st.session_state.min_recording_duration = min_recording_duration
+    transcription_placeholder.markdown("\n".join(st.session_state.full_text) if st.session_state.full_text else "")
 
 # 最後に音が検出された時間を記録
 last_sound_time = time.time()
@@ -337,6 +348,8 @@ async def process_audio_stream(webrtc_ctx):
             # WebRTC接続待機状態
             status_placeholder.warning("音声の受信を待っています...",icon=":material/pending:")
             time.sleep(0.1)
+        if st.session_state.full_text:
+            transcription_placeholder.markdown("\n".join(st.session_state.full_text) if st.session_state.full_text else "")
 
 # メインループを非同期で開始する
 run_async(process_audio_stream(webrtc_ctx))
