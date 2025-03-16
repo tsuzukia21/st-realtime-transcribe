@@ -1,9 +1,16 @@
-# streamlit-app
+# Demo
 
-The application created with stremalit is available to the public.
+![Demo](./demo.gif)
 
-stremalitで作成したアプリを公開しています。
+# Description
 
+This app enables real-time speech-to-text transcription.  
+You can either set up your own transcribe server or use OpenAI's API to call Whisper for transcription.  
+Users can configure settings such as silent mode and recording mode to match their recording conditions.
+
+このアプリはリアルタイム文字起こしをすることが出来ます。  
+文字起こしは自身でサーバーを建てるか、OpenAIのAPIを使ってWhisperを呼び出すこともできます。  
+無音設定、録音設定等、ユーザーが録音状況に合わせて設定することが出来ます。
 
 # How to use
 
