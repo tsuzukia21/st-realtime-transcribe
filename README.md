@@ -22,15 +22,15 @@ For details on usage and code, please refer to the following links.(Japanese)
 
 # Installation
 
-```python
-pip install -r requirements.txt
+```bash
+uv sync
 ```
 
 # Usage
 
-```python
-streamlit run app.py
-python server.py
+```bash
+uv run streamlit run app.py
+uv run python server.py
 ```
 
 # API Key

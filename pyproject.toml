@@ -1,0 +1,21 @@
+[project]
+name = "st-realtime-transcribe"
+version = "0.1.0"
+description = "Realtime speech transcription app using Streamlit and faster-whisper"
+requires-python = ">=3.9"
+dependencies = [
+    "streamlit==1.38.0",
+    "streamlit-webrtc",
+    "requests",
+    "pandas",
+    "altair",
+    "av",
+    "numpy",
+    "twilio",
+    "pydub",
+    "aiortc",
+    "openai",
+    "flask",
+    "faster-whisper",
+]
+
